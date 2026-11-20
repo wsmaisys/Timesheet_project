@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: timesheet_ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Lint with Ruff
+        run: ruff check .
+      - name: Check migrations & Django deploy checks
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: ci-strong-secret-key-for-validation-only-123456
+          DATABASE_URL: postgres://ci:ci_password@localhost:5432/timesheet_ci
+        run: |
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate
+          python manage.py check --deploy
+      - name: Validate OpenAPI schema (drf-spectacular)
+        run: python manage.py spectacular --validate --fail-on-warn --file /tmp/schema.yaml
+      - name: Run pytest suite
+        run: pytest tests -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+      - name: Run Vitest unit tests
+        run: npm test
+      - name: Production Vite build
+        run: npm run build

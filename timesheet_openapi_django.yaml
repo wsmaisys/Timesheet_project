@@ -1,0 +1,3319 @@
+openapi: 3.1.0
+info:
+  title: Timesheet & Workforce Management API
+  version: 1.0.0
+  description: >-
+    Production-ready API contract for the Timesheet & Workforce Management Platform MVP.
+    Implemented with Python, Django, Django REST Framework (DRF), and drf-spectacular.
+    All timestamps are RFC 3339 UTC; work dates are local calendar dates (YYYY-MM-DD).
+    Durations are integer minutes.
+servers:
+  - url: https://{host}/api/v1
+    description: Environment base URL
+    variables:
+      host:
+        default: timesheet.example.com
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+  - name: Auth
+  - name: Identity
+  - name: Users
+  - name: Settings
+  - name: Clients
+  - name: Projects
+  - name: Assignments
+  - name: Timesheets
+  - name: Approvals
+  - name: Reports
+  - name: Dashboard
+  - name: Notifications
+  - name: Audit
+paths:
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: Liveness probe
+      operationId: healthLive
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness probe including database connectivity
+      operationId: healthReady
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Authenticate with email and password
+      operationId: authLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      operationId: authRefresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+      responses:
+        '200':
+          description: Access token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefreshResponse'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout current session
+      operationId: authLogout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /auth/me:
+    get:
+      tags:
+        - Identity
+      summary: Get current user and effective permissions
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTH_INVALID_TOKEN:
+                  value:
+                    error:
+                      code: AUTH_INVALID_TOKEN
+                      message: Authentication credentials were not provided or are invalid.
+                      request_id: req_example
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users within caller scope
+      operationId: listUsers
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ActiveStatus'
+        - name: department
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedUsers'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Users
+      summary: Create a user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTH_FORBIDDEN:
+                  value:
+                    error:
+                      code: AUTH_FORBIDDEN
+                      message: Auth forbidden
+                      request_id: req_example
+                USER_EMAIL_EXISTS:
+                  value:
+                    error:
+                      code: USER_EMAIL_EXISTS
+                      message: User email exists
+                      request_id: req_example
+  /users/{user_id}:
+    get:
+      tags:
+        - Users
+      summary: Get user
+      operationId: getUser
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    patch:
+      tags:
+        - Users
+      summary: Update user
+      operationId: updateUser
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /settings:
+    get:
+      tags:
+        - Settings
+      summary: Retrieve company-wide timesheet configuration
+      operationId: getCompanySettings
+      responses:
+        '200':
+          description: Company settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanySettings'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+    patch:
+      tags:
+        - Settings
+      summary: Update company-wide timesheet configuration
+      operationId: updateCompanySettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanySettingsUpdate'
+      responses:
+        '200':
+          description: Company settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanySettings'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /clients:
+    get:
+      tags:
+        - Clients
+      summary: List clients
+      operationId: listClients
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ActiveStatus'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged client list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedClients'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Clients
+      summary: Create client
+      operationId: createClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTH_FORBIDDEN:
+                  value:
+                    error:
+                      code: AUTH_FORBIDDEN
+                      message: Auth forbidden
+                      request_id: req_example
+                CLIENT_CODE_EXISTS:
+                  value:
+                    error:
+                      code: CLIENT_CODE_EXISTS
+                      message: Client code exists
+                      request_id: req_example
+  /clients/{client_id}:
+    patch:
+      tags:
+        - Clients
+      summary: Update client
+      operationId: updateClient
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdate'
+      responses:
+        '200':
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /projects:
+    get:
+      tags:
+        - Projects
+      summary: List projects visible to caller
+      operationId: listProjects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProjectStatus'
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedProjects'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Projects
+      summary: Create project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTH_FORBIDDEN:
+                  value:
+                    error:
+                      code: AUTH_FORBIDDEN
+                      message: Auth forbidden
+                      request_id: req_example
+                PROJECT_CODE_EXISTS:
+                  value:
+                    error:
+                      code: PROJECT_CODE_EXISTS
+                      message: Project code exists
+                      request_id: req_example
+  /projects/{project_id}:
+    get:
+      tags:
+        - Projects
+      summary: Get project detail
+      operationId: getProject
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Project returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    patch:
+      tags:
+        - Projects
+      summary: Update project
+      operationId: updateProject
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /projects/{project_id}/tasks:
+    get:
+      tags:
+        - Projects
+      summary: List project tasks
+      operationId: listProjectTasks
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ActiveStatus'
+      responses:
+        '200':
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Projects
+      summary: Create project task
+      operationId: createProjectTask
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /projects/{project_id}/tasks/{task_id}:
+    patch:
+      tags:
+        - Projects
+      summary: Update project task
+      operationId: updateProjectTask
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /assignments:
+    get:
+      tags:
+        - Assignments
+      summary: List project assignments
+      operationId: listAssignments
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: active_on
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged assignment list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAssignments'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Assignments
+      summary: Create project assignment
+      operationId: createAssignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentCreate'
+      responses:
+        '201':
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTH_FORBIDDEN:
+                  value:
+                    error:
+                      code: AUTH_FORBIDDEN
+                      message: Auth forbidden
+                      request_id: req_example
+                ASSIGNMENT_DATE_INVALID:
+                  value:
+                    error:
+                      code: ASSIGNMENT_DATE_INVALID
+                      message: Assignment date invalid
+                      request_id: req_example
+  /assignments/{assignment_id}:
+    patch:
+      tags:
+        - Assignments
+      summary: Update project assignment
+      operationId: updateAssignment
+      parameters:
+        - name: assignment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentUpdate'
+      responses:
+        '200':
+          description: Assignment updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /timesheets:
+    get:
+      tags:
+        - Timesheets
+      summary: List timesheets visible to caller
+      operationId: listTimesheets
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TimesheetStatus'
+        - name: period_start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: period_end
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged timesheets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedTimesheets'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    post:
+      tags:
+        - Timesheets
+      summary: Create a timesheet period for current employee
+      operationId: createTimesheet
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimesheetCreate'
+      responses:
+        '201':
+          description: Timesheet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TS_PERIOD_EXISTS:
+                  value:
+                    error:
+                      code: TS_PERIOD_EXISTS
+                      message: Timesheet already exists for this period.
+                      request_id: req_example
+                TS_PERIOD_INVALID:
+                  value:
+                    error:
+                      code: TS_PERIOD_INVALID
+                      message: Period boundaries are invalid.
+                      request_id: req_example
+  /timesheets/{timesheet_id}:
+    get:
+      tags:
+        - Timesheets
+      summary: Get timesheet with entries
+      operationId: getTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Timesheet returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    patch:
+      tags:
+        - Timesheets
+      summary: Update editable timesheet metadata
+      operationId: updateTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimesheetPatch'
+      responses:
+        '200':
+          description: Timesheet updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /timesheets/{timesheet_id}/entries:
+    post:
+      tags:
+        - Timesheets
+      summary: Add a time entry
+      operationId: addTimeEntry
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeEntryCreate'
+      responses:
+        '201':
+          description: Entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeEntry'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TS_NOT_EDITABLE:
+                  value:
+                    error:
+                      code: TS_NOT_EDITABLE
+                      message: Timesheet is not editable in its current status.
+                      request_id: req_example
+                TS_ENTRY_INVALID_DURATION:
+                  value:
+                    error:
+                      code: TS_ENTRY_INVALID_DURATION
+                      message: Duration must be a positive multiple of configured increment.
+                      request_id: req_example
+                TS_ENTRY_DATE_OUTSIDE_PERIOD:
+                  value:
+                    error:
+                      code: TS_ENTRY_DATE_OUTSIDE_PERIOD
+                      message: Work date is outside the timesheet period.
+                      request_id: req_example
+                ASSIGNMENT_NOT_ACTIVE:
+                  value:
+                    error:
+                      code: ASSIGNMENT_NOT_ACTIVE
+                      message: Employee has no active assignment on this work date.
+                      request_id: req_example
+                TASK_NOT_IN_PROJECT:
+                  value:
+                    error:
+                      code: TASK_NOT_IN_PROJECT
+                      message: Task does not belong to the selected project.
+                      request_id: req_example
+                PROJECT_INACTIVE:
+                  value:
+                    error:
+                      code: PROJECT_INACTIVE
+                      message: Project is not active for time entry.
+                      request_id: req_example
+  /timesheets/{timesheet_id}/entries/{entry_id}:
+    patch:
+      tags:
+        - Timesheets
+      summary: Update a time entry
+      operationId: updateTimeEntry
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeEntryPatch'
+      responses:
+        '200':
+          description: Entry updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeEntry'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+    delete:
+      tags:
+        - Timesheets
+      summary: Delete a time entry from editable timesheet
+      operationId: deleteTimeEntry
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Entry deleted
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /timesheets/{timesheet_id}/submit:
+    post:
+      tags:
+        - Timesheets
+      summary: Submit timesheet for approval
+      operationId: submitTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionedAction'
+      responses:
+        '200':
+          description: Timesheet submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TS_ALREADY_SUBMITTED:
+                  value:
+                    error:
+                      code: TS_ALREADY_SUBMITTED
+                      message: Timesheet has already been submitted or approved.
+                      request_id: req_example
+                TS_SUBMISSION_INCOMPLETE:
+                  value:
+                    error:
+                      code: TS_SUBMISSION_INCOMPLETE
+                      message: Cannot submit an empty or incomplete timesheet.
+                      request_id: req_example
+                TS_STATE_CONFLICT:
+                  value:
+                    error:
+                      code: TS_STATE_CONFLICT
+                      message: Timesheet version conflict.
+                      request_id: req_example
+  /approvals/pending:
+    get:
+      tags:
+        - Approvals
+      summary: List pending approvals assigned to current user
+      operationId: listPendingApprovals
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: period_start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Pending timesheets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedTimesheets'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /timesheets/{timesheet_id}/approve:
+    post:
+      tags:
+        - Approvals
+      summary: Approve submitted timesheet
+      operationId: approveTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionedAction'
+      responses:
+        '200':
+          description: Timesheet approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPROVER_OUT_OF_SCOPE:
+                  value:
+                    error:
+                      code: APPROVER_OUT_OF_SCOPE
+                      message: Approver is outside scope or cannot self-approve.
+                      request_id: req_example
+                TS_STATE_CONFLICT:
+                  value:
+                    error:
+                      code: TS_STATE_CONFLICT
+                      message: Timesheet state changed concurrently.
+                      request_id: req_example
+                TS_NOT_SUBMITTED:
+                  value:
+                    error:
+                      code: TS_NOT_SUBMITTED
+                      message: Timesheet is not in SUBMITTED status.
+                      request_id: req_example
+  /timesheets/{timesheet_id}/reject:
+    post:
+      tags:
+        - Approvals
+      summary: Reject/return submitted timesheet with reason
+      operationId: rejectTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Decision'
+      responses:
+        '200':
+          description: Timesheet returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPROVAL_REASON_REQUIRED:
+                  value:
+                    error:
+                      code: APPROVAL_REASON_REQUIRED
+                      message: A non-empty reason is required.
+                      request_id: req_example
+  /timesheets/{timesheet_id}/reopen:
+    post:
+      tags:
+        - Approvals
+      summary: Reopen a timesheet with reason
+      operationId: reopenTimesheet
+      parameters:
+        - name: timesheet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Decision'
+      responses:
+        '200':
+          description: Timesheet reopened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        '409':
+          $ref: '#/components/responses/HTTP409'
+        '422':
+          $ref: '#/components/responses/HTTP422'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /reports/time-summary:
+    get:
+      tags:
+        - Reports
+      summary: Get scoped time summary report
+      operationId: getTimeSummary
+      parameters:
+        - name: from_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: billable
+          in: query
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TimesheetStatus'
+      responses:
+        '200':
+          description: Summary rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportRow'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /reports/time-summary/export:
+    get:
+      tags:
+        - Reports
+      summary: Export scoped time summary report as CSV
+      operationId: exportTimeSummary
+      parameters:
+        - name: from_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: billable
+          in: query
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TimesheetStatus'
+      responses:
+        '200':
+          description: CSV export stream
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        default:
+          description: Standard error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                EXPORT_TOO_LARGE:
+                  value:
+                    error:
+                      code: EXPORT_TOO_LARGE
+                      message: Export exceeds maximum configured row limit.
+                      request_id: req_example
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Get role-scoped dashboard metrics and widgets
+      operationId: getDashboard
+      responses:
+        '200':
+          description: Role-scoped dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: List current user's notifications
+      operationId: listNotifications
+      parameters:
+        - name: unread_only
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedNotifications'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /notifications/{notification_id}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Mark a notification as read
+      operationId: markNotificationRead
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '404':
+          $ref: '#/components/responses/HTTP404'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /notifications/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all notifications for current user as read
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: Notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  marked_count:
+                    type: integer
+                required:
+                  - marked_count
+                additionalProperties: false
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        default:
+          $ref: '#/components/responses/StandardError'
+  /audit-events:
+    get:
+      tags:
+        - Audit
+      summary: Search audit events (Admin only)
+      operationId: listAuditEvents
+      parameters:
+        - name: entity_type
+          in: query
+          schema:
+            type: string
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+        - name: actor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Paged audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditEvents'
+        '400':
+          $ref: '#/components/responses/HTTP400'
+        '401':
+          $ref: '#/components/responses/HTTP401'
+        '403':
+          $ref: '#/components/responses/HTTP403'
+        '429':
+          $ref: '#/components/responses/HTTP429'
+        '500':
+          $ref: '#/components/responses/HTTP500'
+        '503':
+          $ref: '#/components/responses/HTTP503'
+        default:
+          $ref: '#/components/responses/StandardError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserRole:
+      type: string
+      enum:
+        - EMPLOYEE
+        - APPROVER
+        - ADMIN
+        - MANAGEMENT_VIEWER
+    ActiveStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - INACTIVE
+    ProjectStatus:
+      type: string
+      enum:
+        - DRAFT
+        - ACTIVE
+        - ON_HOLD
+        - CLOSED
+    TimesheetStatus:
+      type: string
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - REJECTED
+        - APPROVED
+        - REOPENED
+        - CANCELLED
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+      required:
+        - status
+      additionalProperties: false
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        issue:
+          type: string
+      additionalProperties: false
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        request_id:
+          type: string
+      additionalProperties: false
+      required:
+        - code
+        - message
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+      additionalProperties: false
+      required:
+        - error
+    PageMeta:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+      required:
+        - limit
+        - offset
+        - total
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+      additionalProperties: false
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+      required:
+        - refresh
+      additionalProperties: false
+    TokenRefreshResponse:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+        - access
+      additionalProperties: false
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+      additionalProperties: false
+    TokenResponse:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - access
+        - refresh
+        - user
+        - permissions
+      additionalProperties: false
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_code:
+          type: string
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+        manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        department:
+          type:
+            - string
+            - 'null'
+        timezone:
+          type: string
+        expected_daily_minutes:
+          type:
+            - integer
+            - 'null'
+        expected_weekly_minutes:
+          type:
+            - integer
+            - 'null'
+        can_override_assignment:
+          type: boolean
+      additionalProperties: false
+      required:
+        - id
+        - employee_code
+        - email
+        - full_name
+        - role
+        - status
+        - timezone
+    CurrentUser:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        permissions:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      required:
+        - user
+        - permissions
+    UserCreate:
+      type: object
+      properties:
+        employee_code:
+          type: string
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        role:
+          $ref: '#/components/schemas/UserRole'
+        manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        department:
+          type:
+            - string
+            - 'null'
+        timezone:
+          type: string
+        expected_daily_minutes:
+          type:
+            - integer
+            - 'null'
+        expected_weekly_minutes:
+          type:
+            - integer
+            - 'null'
+        can_override_assignment:
+          type: boolean
+      additionalProperties: false
+      required:
+        - employee_code
+        - email
+        - full_name
+        - role
+        - timezone
+    UserUpdate:
+      type: object
+      properties:
+        employee_code:
+          type: string
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+        manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        department:
+          type:
+            - string
+            - 'null'
+        timezone:
+          type: string
+        expected_daily_minutes:
+          type:
+            - integer
+            - 'null'
+        expected_weekly_minutes:
+          type:
+            - integer
+            - 'null'
+        can_override_assignment:
+          type: boolean
+      additionalProperties: false
+    CompanySettings:
+      type: object
+      properties:
+        week_start_day:
+          type: integer
+          minimum: 0
+          maximum: 6
+        default_timezone:
+          type: string
+        expected_daily_minutes:
+          type: integer
+        expected_weekly_minutes:
+          type: integer
+        entry_increment_minutes:
+          type: integer
+          enum:
+            - 5
+            - 6
+            - 15
+            - 30
+            - 60
+        max_daily_minutes:
+          type: integer
+        submission_deadline_day:
+          type: integer
+          minimum: 0
+          maximum: 6
+        submission_deadline_time:
+          type: string
+        allow_billable_override:
+          type: boolean
+        allow_duplicate_entries:
+          type: boolean
+        allow_self_approval:
+          type: boolean
+        allow_overlapping_assignments:
+          type: boolean
+        require_minimum_hours_on_submit:
+          type: boolean
+        max_export_rows:
+          type: integer
+        sap_modules:
+          type: array
+          items:
+            type: string
+        sap_workstreams:
+          type: array
+          items:
+            type: string
+      required:
+        - week_start_day
+        - default_timezone
+        - expected_daily_minutes
+        - expected_weekly_minutes
+        - entry_increment_minutes
+        - max_daily_minutes
+        - submission_deadline_day
+        - submission_deadline_time
+        - allow_billable_override
+        - allow_duplicate_entries
+        - allow_self_approval
+        - allow_overlapping_assignments
+        - require_minimum_hours_on_submit
+        - max_export_rows
+        - sap_modules
+        - sap_workstreams
+      additionalProperties: false
+    CompanySettingsUpdate:
+      type: object
+      properties:
+        week_start_day:
+          type: integer
+          minimum: 0
+          maximum: 6
+        default_timezone:
+          type: string
+        expected_daily_minutes:
+          type: integer
+          minimum: 60
+          maximum: 1440
+        expected_weekly_minutes:
+          type: integer
+          minimum: 60
+          maximum: 10080
+        entry_increment_minutes:
+          type: integer
+          enum:
+            - 5
+            - 6
+            - 15
+            - 30
+            - 60
+        max_daily_minutes:
+          type: integer
+          minimum: 60
+          maximum: 1440
+        submission_deadline_day:
+          type: integer
+          minimum: 0
+          maximum: 6
+        submission_deadline_time:
+          type: string
+        allow_billable_override:
+          type: boolean
+        allow_duplicate_entries:
+          type: boolean
+        allow_self_approval:
+          type: boolean
+        allow_overlapping_assignments:
+          type: boolean
+        require_minimum_hours_on_submit:
+          type: boolean
+        max_export_rows:
+          type: integer
+          minimum: 1
+        sap_modules:
+          type: array
+          items:
+            type: string
+        sap_workstreams:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - name
+        - status
+    ClientCreate:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+      additionalProperties: false
+      required:
+        - code
+        - name
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+      additionalProperties: false
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        client_name:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        project_manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        billable_default:
+          type: boolean
+        budget_hours:
+          type:
+            - number
+            - 'null'
+        version:
+          type: integer
+      additionalProperties: false
+      required:
+        - id
+        - client_id
+        - code
+        - name
+        - start_date
+        - status
+        - billable_default
+        - version
+    ProjectCreate:
+      type: object
+      properties:
+        client_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        project_manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        billable_default:
+          type: boolean
+        budget_hours:
+          type:
+            - number
+            - 'null'
+      additionalProperties: false
+      required:
+        - client_id
+        - code
+        - name
+        - start_date
+        - billable_default
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        project_manager_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        billable_default:
+          type: boolean
+        budget_hours:
+          type:
+            - number
+            - 'null'
+        version:
+          type: integer
+      additionalProperties: false
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+        sap_workstream:
+          type:
+            - string
+            - 'null'
+        sap_module:
+          type:
+            - string
+            - 'null'
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - code
+        - name
+        - status
+    TaskCreate:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        sap_workstream:
+          type:
+            - string
+            - 'null'
+        sap_module:
+          type:
+            - string
+            - 'null'
+      additionalProperties: false
+      required:
+        - code
+        - name
+    TaskUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ActiveStatus'
+        sap_workstream:
+          type:
+            - string
+            - 'null'
+        sap_module:
+          type:
+            - string
+            - 'null'
+      additionalProperties: false
+    Assignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        project_id:
+          type: string
+          format: uuid
+        project_code:
+          type: string
+        project_name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        allocation_percent:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 100
+      additionalProperties: false
+      required:
+        - id
+        - user_id
+        - project_id
+        - start_date
+    AssignmentCreate:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        allocation_percent:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 100
+      additionalProperties: false
+      required:
+        - user_id
+        - project_id
+        - start_date
+    AssignmentUpdate:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type:
+            - string
+            - 'null'
+          format: date
+        allocation_percent:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 100
+      additionalProperties: false
+    TimeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        work_date:
+          type: string
+          format: date
+        project_id:
+          type: string
+          format: uuid
+        project_code:
+          type: string
+        project_name:
+          type: string
+        task_id:
+          type: string
+          format: uuid
+        task_code:
+          type: string
+        task_name:
+          type: string
+        sap_module:
+          type:
+            - string
+            - 'null'
+        sap_workstream:
+          type:
+            - string
+            - 'null'
+        duration_minutes:
+          type: integer
+          minimum: 1
+        billable:
+          type: boolean
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      additionalProperties: false
+      required:
+        - id
+        - work_date
+        - project_id
+        - task_id
+        - duration_minutes
+        - billable
+        - description
+    TimeEntryCreate:
+      type: object
+      properties:
+        work_date:
+          type: string
+          format: date
+        project_id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        duration_minutes:
+          type: integer
+          minimum: 1
+        billable:
+          type: boolean
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      additionalProperties: false
+      required:
+        - work_date
+        - project_id
+        - task_id
+        - duration_minutes
+        - billable
+        - description
+    TimeEntryPatch:
+      type: object
+      properties:
+        work_date:
+          type: string
+          format: date
+        project_id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        duration_minutes:
+          type: integer
+          minimum: 1
+        billable:
+          type: boolean
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      additionalProperties: false
+    ApprovalEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        timesheet_id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+          format: uuid
+        actor_name:
+          type: string
+        action:
+          type: string
+          enum:
+            - APPROVED
+            - REJECTED
+            - REOPENED
+        reason:
+          type:
+            - string
+            - 'null'
+        created_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - timesheet_id
+        - actor_id
+        - action
+        - created_at
+    Timesheet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        employee_code:
+          type: string
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/TimesheetStatus'
+        notes:
+          type:
+            - string
+            - 'null'
+        assigned_approver_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        total_minutes:
+          type: integer
+          minimum: 0
+        billable_minutes:
+          type: integer
+          minimum: 0
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeEntry'
+        approval_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalEvent'
+        submitted_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        approved_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        version:
+          type: integer
+      additionalProperties: false
+      required:
+        - id
+        - user_id
+        - period_start
+        - period_end
+        - status
+        - total_minutes
+        - entries
+        - version
+    TimesheetCreate:
+      type: object
+      properties:
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        notes:
+          type:
+            - string
+            - 'null'
+      additionalProperties: false
+      required:
+        - period_start
+        - period_end
+    TimesheetPatch:
+      type: object
+      properties:
+        notes:
+          type:
+            - string
+            - 'null'
+          maxLength: 2000
+        version:
+          type: integer
+      additionalProperties: false
+    VersionedAction:
+      type: object
+      properties:
+        version:
+          type: integer
+      additionalProperties: false
+    Decision:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        version:
+          type: integer
+      additionalProperties: false
+      required:
+        - reason
+    ReportRow:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        employee_code:
+          type: string
+        employee_name:
+          type: string
+        department:
+          type:
+            - string
+            - 'null'
+        project_id:
+          type: string
+          format: uuid
+        project_code:
+          type: string
+        project_name:
+          type: string
+        billable_minutes:
+          type: integer
+        non_billable_minutes:
+          type: integer
+        total_minutes:
+          type: integer
+      additionalProperties: false
+      required:
+        - user_id
+        - project_id
+        - billable_minutes
+        - non_billable_minutes
+        - total_minutes
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        actor_email:
+          type: string
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+        before_json:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        after_json:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        request_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - actor_email
+        - action
+        - entity_type
+        - entity_id
+        - request_id
+        - created_at
+      additionalProperties: false
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        read_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        delivery_status:
+          type: string
+          enum:
+            - PENDING
+            - SENT
+            - FAILED
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - user_id
+        - type
+        - title
+        - payload
+        - delivery_status
+        - created_at
+      additionalProperties: false
+    DashboardSummary:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/UserRole'
+        current_period:
+          type: object
+          additionalProperties: true
+        employee_summary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        manager_summary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        admin_summary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        management_summary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        metric_definitions:
+          type: object
+          additionalProperties: true
+      required:
+        - role
+        - current_period
+        - metric_definitions
+      additionalProperties: false
+    PagedUsers:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedClients:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Client'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedProjects:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedAssignments:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Assignment'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedTimesheets:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Timesheet'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedAuditEvents:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      additionalProperties: false
+      required:
+        - items
+        - meta
+    PagedNotifications:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        unread_count:
+          type: integer
+      additionalProperties: false
+      required:
+        - items
+        - meta
+        - unread_count
+  responses:
+    StandardError:
+      description: Standard error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP400:
+      description: Invalid request or business rule
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP401:
+      description: Unauthenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP403:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP404:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP409:
+      description: State conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP422:
+      description: Semantic validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP429:
+      description: Rate limited
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP500:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    HTTP503:
+      description: Service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+x-implementation-guidance:
+  backend_language: Python
+  backend_framework: Django
+  api_framework: Django REST Framework
+  openapi_version: 3.1.0
+  schema_generation: drf-spectacular
+  database: PostgreSQL (with SQLite dev/test fallback)
+  architecture: Modular Django monolith for MVP
+  background_jobs: Celery with Redis (optional/outbox eager fallback)
+  authentication: Django authentication with JWT bearer tokens and OIDC/SAML adapter boundary
+  authorization: Django/DRF role-based and object-level permissions enforced server-side
+  admin: Django Admin for restricted internal administration only
+  integration_boundaries:
+    - SAP adapter (integrations/sap)
+    - AI service adapter (integrations/ai)
+  note: These extensions document implementation guidance; they do not alter the normative API paths or schemas.
